@@ -6,7 +6,7 @@ from pwnutils.utils import detect_arch
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("pwninit")
+logger = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:

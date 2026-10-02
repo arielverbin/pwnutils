@@ -2,28 +2,6 @@ from pathlib import Path
 from typing import Tuple
 import os
 import glob
-import logging
-from rich.console import Console
-from rich.logging import RichHandler
-
-console = Console(stderr=True)
-
-def setup_logging(debug: bool = False) -> None:
-    """Route all logging through rich. Tracebacks are only rendered in debug mode."""
-    logging.basicConfig(
-        level=logging.DEBUG if debug else logging.INFO,
-        format="%(message)s",
-        handlers=[RichHandler(console=console, show_time=False, show_path=debug, rich_tracebacks=True)],
-        force=True,
-    )
-
-def describe_exception(e: BaseException) -> str:
-    """One-line, traceback-free description of an error for the user."""
-    message = str(e).strip()
-    if isinstance(e, AssertionError):
-        # Our own validation failures: the message is written for the user already.
-        return message or "assertion failed (run with --debug for details)"
-    return f"{type(e).__name__}: {message}" if message else type(e).__name__
 
 # pwntools ELF.arch value -> qemu-user binary name.
 # Extend this if you start pwning other architectures.

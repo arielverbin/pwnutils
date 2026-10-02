@@ -152,7 +152,7 @@ def run_executable(executable: Path, libc_path: str, ld_path: str, arch: str, ex
     qemu_argv += [str(executable.resolve())]
     qemu_argv += exec_args
 
-    logger.info(f"running: {' '.join(qemu_argv)}")
+    logger.debug(f"running: {' '.join(qemu_argv)}")
     result = subprocess.call(qemu_argv)
     return result
 

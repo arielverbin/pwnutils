@@ -6,7 +6,7 @@ import pwnutils.pwninit as pwninit
 import pwnutils.pwnrun as pwnrun
 import pwnutils.pwngdb as pwngdb
 
-from pwnutils.utils import setup_logging, describe_exception
+from pwnutils.log import setup_logging, describe_exception
 
 logger = logging.getLogger(__name__)
 
