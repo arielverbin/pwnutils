@@ -9,6 +9,7 @@ description = "Personal pwn exercise scaffolding tool"
 requires-python = ">=3.9"
 dependencies = [
     "pwntools",
+    "rich",
 ]
 
 [project.scripts]

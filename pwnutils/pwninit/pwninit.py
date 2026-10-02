@@ -113,6 +113,7 @@ def setup_pwn_libc(pwn_dir: Path, *, libc_path: Path, skip_libc_fetch: bool) -> 
     """ Copy the libc into pwn_dir.
     Best-effort: unstrip it, try to fetch a matching dynamic loader. """
 
+    assert libc_path.is_file(), f"libc not found: {libc_path}"
     dest_libc = pwn_dir / "libc.so.6"
     shutil.copy2(libc_path, dest_libc)
     dest_libc.chmod(0o644)

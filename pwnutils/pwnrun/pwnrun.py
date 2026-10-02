@@ -103,7 +103,7 @@ def libc_supports_modern_crt(libc_path: str) -> bool:
 
 def resolve_compiler(cc: str, arch: str) -> str:
     cc = cc or CC_BY_ARCH.get(arch)
-    assert cc, f"no cross-compiler known for arch {arch!r}"
+    assert cc, f"no cross-compiler known for arch {arch!r} -- pass one with --cc"
     assert shutil.which(cc), f"{cc!r} not found in PATH -- install it: sudo apt install {APT_PACKAGE_BY_ARCH.get(arch, cc)}"
     return cc
 
