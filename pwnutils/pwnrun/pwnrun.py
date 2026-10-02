@@ -52,19 +52,89 @@ APT_PACKAGE_BY_ARCH = {
     "amd64": "gcc-x86-64-linux-gnu",
 }
 
-def compile_sources(source: Path, cc: str, arch: str, out: str) -> Path:
+# The cross-compiler's crt1.o calls __libc_start_main@GLIBC_2.34. Older libcs
+# don't export that version, so against them we skip the start files and link
+# this minimal _start instead: it passes argc/argv/envp to main, aligns the
+# stack as the ABI requires, and calls exit() with main's return value.
+MODERN_CRT_GLIBC_VERSION = b"GLIBC_2.34"
+
+START_STUB_BY_ARCH = {
+    "i386": """
+    .text
+    .globl _start
+    .type _start, @function
+_start:
+    xorl  %ebp, %ebp
+    movl  (%esp), %eax              # argc
+    leal  4(%esp), %ecx             # argv
+    leal  8(%esp,%eax,4), %edx      # envp = argv + argc + 1
+    andl  $-16, %esp
+    subl  $4, %esp                  # 4 + 3 pushed args keeps esp 16-aligned at the call
+    pushl %edx
+    pushl %ecx
+    pushl %eax
+    call  main
+    movl  %eax, (%esp)
+    call  exit
+    hlt
+    .section .note.GNU-stack,"",@progbits
+""",
+    "amd64": """
+    .text
+    .globl _start
+    .type _start, @function
+_start:
+    xorl  %ebp, %ebp
+    movl  (%rsp), %edi              # argc
+    leaq  8(%rsp), %rsi             # argv
+    leaq  8(%rsi,%rdi,8), %rdx      # envp = argv + argc + 1
+    andq  $-16, %rsp
+    call  main
+    movl  %eax, %edi
+    call  exit
+    hlt
+    .section .note.GNU-stack,"",@progbits
+""",
+}
+
+def libc_supports_modern_crt(libc_path: str) -> bool:
+    """True if the libc exports the __libc_start_main version the toolchain's crt1.o needs."""
+    return MODERN_CRT_GLIBC_VERSION in Path(libc_path).read_bytes()
+
+def resolve_compiler(cc: str, arch: str) -> str:
     cc = cc or CC_BY_ARCH.get(arch)
     assert cc, f"no cross-compiler known for arch {arch!r}"
     assert shutil.which(cc), f"{cc!r} not found in PATH -- install it: sudo apt install {APT_PACKAGE_BY_ARCH.get(arch, cc)}"
+    return cc
 
-    if out is None:
-        _, filename = tempfile.mkstemp(suffix=".out")
-        out_path = Path(filename)
-    else:
-        out_path = Path(out)
+def resolve_out_path(out: str) -> Path:
+    if out is not None:
+        return Path(out)
+    _, filename = tempfile.mkstemp(suffix=".out")
+    return Path(filename)
 
-    cc_argv = [cc, "-g", "-no-pie", "-nostartfiles", "-o", str(out_path), str(source)]
-    result = subprocess.run(cc_argv)
+def write_start_stub(arch: str, directory: str) -> Path:
+    stub = START_STUB_BY_ARCH.get(arch)
+    assert stub, f"no _start stub for arch {arch!r}"
+    stub_path = Path(directory) / "pwnrun_start.S"
+    stub_path.write_text(stub)
+    return stub_path
+
+def compile_sources(source: Path, cc: str, arch: str, out: str, libc_path: str) -> Path:
+    cc = resolve_compiler(cc, arch)
+    out_path = resolve_out_path(out)
+    cc_argv = [cc, "-g", "-no-pie", "-o", str(out_path), str(source)]
+
+    with tempfile.TemporaryDirectory() as stub_dir:
+        if not libc_supports_modern_crt(libc_path):
+            logger.warning(
+                "libc predates %s: linking a minimal _start instead of crt1.o. "
+                "__libc_start_main is skipped, so the program's constructors/destructors won't run",
+                MODERN_CRT_GLIBC_VERSION.decode(),
+            )
+            cc_argv += ["-nostartfiles", str(write_start_stub(arch, stub_dir))]
+
+        result = subprocess.run(cc_argv)
     assert result.returncode == 0, f"compilation failed"
     out_path.chmod(0o755)
 
@@ -96,7 +166,7 @@ def run(args: Any):
     libc_path, ld_path = resolve_libc_ld(binary_path=args.libc, libc=args.libc, ld=args.ld)
     arch = detect_arch(libc_path)
 
-    executable = compile_sources(source, args.cc, arch, args.out)
+    executable = compile_sources(source, args.cc, arch, args.out, libc_path)
 
     if args.no_run: return
 
