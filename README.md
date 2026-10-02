@@ -1,8 +1,6 @@
 # pwnutils
 
-Small CLI for setting up pwnable exercises and running or debugging them against
-the challenge's exact libc, under `qemu-user`. That means the same workflow on any
-host: an x86 challenge runs fine on an ARM machine.
+Small CLI for setting up cross-compile pwnable exercises, running or debugging them against the challenge's exact libc, under `qemu-user`. That means the same workflow on any host: an x86 challenge runs fine on an ARM machine.
 
 ```
 pwnutils [--debug] {init,run,gdb} ...
