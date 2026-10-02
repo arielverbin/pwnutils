@@ -19,9 +19,10 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="pwnrun",
         description="Compile a C file with a cross-compiler matching a target libc's "
-                    "arch, and run it against that exact libc/ld under qemu-user.",
+                    "arch (or take an already-built binary), and run it against that "
+                    "exact libc/ld under qemu-user.",
     )
-    parser.add_argument("source", help="path to the .c file to compile")
+    parser.add_argument("source", help="path to a .c file to compile, or to a prebuilt ELF binary to run as-is")
     parser.add_argument(
         "--libc", required=True,
         help="path to the target libc file (e.g. libc.so.6)",
@@ -140,6 +141,17 @@ def compile_sources(source: Path, cc: str, arch: str, out: str, libc_path: str) 
 
     return out_path
 
+def is_elf(path: Path) -> bool:
+    with open(path, "rb") as f:
+        return f.read(4) == b"\x7fELF"
+
+def check_prebuilt_binary(binary: Path, arch: str, args: Any) -> None:
+    binary_arch = detect_arch(binary)
+    assert binary_arch == arch, f"{binary} is {binary_arch} but the libc is {arch}"
+    ignored = [flag for flag, value in (("--cc", args.cc), ("--out", args.out), ("--no-run", args.no_run)) if value]
+    if ignored:
+        logger.warning("%s is a prebuilt binary; ignoring %s", binary, ", ".join(ignored))
+
 def run_executable(executable: Path, libc_path: str, ld_path: str, arch: str, exec_args: Any) -> None:
     qemu = qemu_binary_for_arch(arch)
     assert shutil.which(qemu), f"{qemu!r} not found in PATH"
@@ -166,10 +178,13 @@ def run(args: Any):
     libc_path, ld_path = resolve_libc_ld(binary_path=args.libc, libc=args.libc, ld=args.ld)
     arch = detect_arch(libc_path)
 
-    executable = compile_sources(source, args.cc, arch, args.out, libc_path)
+    if is_elf(source):
+        check_prebuilt_binary(source, arch, args)
+        sys.exit(run_executable(source, libc_path, ld_path, arch, args.exec_args))
+    else:
+        executable = compile_sources(source, args.cc, arch, args.out, libc_path)
+        if args.no_run: return
 
-    if args.no_run: return
-
-    result = run_executable(executable, libc_path, ld_path, arch, args.exec_args)
-    if not args.out: executable.unlink()
-    sys.exit(result)
+        result = run_executable(executable, libc_path, ld_path, arch, args.exec_args)
+        if not args.out: executable.unlink()
+        sys.exit(result)
