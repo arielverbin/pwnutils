@@ -198,7 +198,7 @@ def stop_qemu(qemu_proc: subprocess.Popen) -> None:
 @contextmanager
 def qemu_gdbstub(qemu_argv: List[str]) -> Generator[subprocess.Popen, None, None]:
     """Launch qemu-user with its gdbstub enabled, terminated on exit."""
-    logger.info(f"running: {' '.join(qemu_argv)}")
+    logger.debug(f"running: {' '.join(qemu_argv)}")
     # Detach qemu into its own session so Ctrl+C at the terminal, which goes to
     # the whole foreground process group, does NOT reach it. Otherwise qemu's
     # default SIGINT handler kills it out from under gdb. gdb stays in the
@@ -212,7 +212,7 @@ def qemu_gdbstub(qemu_argv: List[str]) -> Generator[subprocess.Popen, None, None
         stop_qemu(qemu_proc)
 
 def run_gdb(gdb_argv: List[str]) -> int:
-    logger.info(f"running: {' '.join(gdb_argv)}")
+    logger.debug(f"running: {' '.join(gdb_argv)}")
     # Ignore SIGINT in this wrapper while gdb owns the foreground, so a Ctrl+C
     # inside gdb doesn't tear qemu down from under it.
     old_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -233,7 +233,7 @@ def run(args: Any):
 
     libc, ld = resolve_libc_ld(str(binary_path), args.libc, args.ld)
     port = free_port()
-    logger.info(f"arch={arch} port={port}")
+    logger.debug(f"arch={arch} port={port}")
 
     qemu_argv = build_qemu_argv(qemu, port, binary_path, libc, ld, args.exec_args)
     with discovery_script(binary_path, args.break_symbol) as script_path:
