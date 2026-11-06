@@ -24,7 +24,7 @@ def build_parser():
     )
     parser.add_argument("source", help="path to a .c file to compile, or to a prebuilt ELF binary to run as-is")
     parser.add_argument(
-        "--libc", required=True,
+        "--libc", required=False,
         help="path to the target libc file (e.g. libc.so.6)",
     )
     parser.add_argument(
@@ -173,9 +173,11 @@ def run(args: Any):
     source = Path(args.source)
     assert source.is_file(), f"source not found: {source}"
 
-    assert os.path.isfile(args.libc), f"libc not found: {args.libc}"
-    # Anchor ld auto-detection at the libc, not at the source file.
-    libc_path, ld_path = resolve_libc_ld(binary_path=args.libc, libc=args.libc, ld=args.ld)
+    # Anchor ld auto-detection at the libc
+    libc_path, ld_path = resolve_libc_ld(binary_path=args.source, libc=args.libc, ld=args.ld)
+    assert libc_path, "Could not resolve libc, pass explicitly with --libc PATH"
+    assert libc_path, "Could not resolve ld, pass explicitly with --ld PATH"
+
     arch = detect_arch(libc_path)
 
     if is_elf(source):
